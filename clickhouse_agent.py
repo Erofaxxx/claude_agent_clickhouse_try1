@@ -46,8 +46,27 @@ class ClickHouseAgent:
         clickhouse_config = self.config['clickhouse']
         ai_config = self.config['ai']
 
-        # Set Anthropic API key
-        os.environ['ANTHROPIC_API_KEY'] = ai_config['api_key']
+        # Validate and set Anthropic API key
+        api_key = ai_config.get('api_key', '')
+        if not api_key or api_key == 'sk-ant-api03-YOUR_API_KEY_HERE':
+            raise ValueError(
+                "❌ Invalid or missing Anthropic API key in config.yaml\n"
+                "Please set a valid API key in the 'ai.api_key' field.\n"
+                "Get your API key from: https://console.anthropic.com/"
+            )
+        os.environ['ANTHROPIC_API_KEY'] = api_key
+        print(f"✅ API key configured (starts with: {api_key[:15]}...)")
+
+        # Validate ClickHouse configuration
+        required_fields = ['host', 'port', 'user', 'password', 'database']
+        missing_fields = [field for field in required_fields if not clickhouse_config.get(field)]
+        if missing_fields:
+            raise ValueError(
+                f"❌ Missing required ClickHouse configuration fields: {', '.join(missing_fields)}\n"
+                "Please check your config.yaml file."
+            )
+
+        print(f"✅ ClickHouse connection: {clickhouse_config['user']}@{clickhouse_config['host']}:{clickhouse_config['port']}/{clickhouse_config['database']}")
 
         # Setup environment variables for ClickHouse MCP server
         # Start with system environment so PATH and other essentials are available
@@ -62,25 +81,56 @@ class ClickHouseAgent:
         })
 
         # Create agent options with MCP server configuration
-        options = ClaudeAgentOptions(
-            allowed_tools=[
-                "mcp__mcp-clickhouse__list_databases",
-                "mcp__mcp-clickhouse__list_tables",
-                "mcp__mcp-clickhouse__run_select_query",
-                "mcp__mcp-clickhouse__run_chdb_select_query",
-            ],
-            mcp_servers={
-                "mcp-clickhouse": {
-                    "command": "uvx",
-                    "args": [
-                        "mcp-clickhouse",
-                        "--config", self.config_path
-                    ],
-                    "env": env,
-                }
-            },
-            model=ai_config.get('model', 'claude-sonnet-4'),
-        )
+        print("🔄 Initializing MCP server connection...")
+
+        try:
+            options = ClaudeAgentOptions(
+                allowed_tools=[
+                    "mcp__mcp-clickhouse__list_databases",
+                    "mcp__mcp-clickhouse__list_tables",
+                    "mcp__mcp-clickhouse__run_select_query",
+                    "mcp__mcp-clickhouse__run_chdb_select_query",
+                ],
+                mcp_servers={
+                    "mcp-clickhouse": {
+                        "command": "uvx",
+                        "args": [
+                            "mcp-clickhouse",
+                            "--config", self.config_path
+                        ],
+                        "env": env,
+                    }
+                },
+                model=ai_config.get('model', 'claude-sonnet-4'),
+            )
+            print("✅ MCP server connection initialized successfully")
+        except Exception as e:
+            error_msg = str(e)
+            print(f"\n❌ Failed to initialize MCP server connection")
+            print(f"Error details: {error_msg}\n")
+
+            # Provide detailed troubleshooting information
+            if "timeout" in error_msg.lower() or "initialize" in error_msg.lower():
+                print("💡 Connection timeout troubleshooting:")
+                print("   1. Check if 'uv' is installed: which uvx")
+                print("      Install with: curl -LsSf https://astral.sh/uv/install.sh | sh")
+                print("   2. Verify mcp-clickhouse package can be installed:")
+                print("      uvx mcp-clickhouse --help")
+                print("   3. Check ClickHouse server is accessible:")
+                print(f"      Host: {clickhouse_config['host']}:{clickhouse_config['port']}")
+                print("   4. Verify your API key is valid at: https://console.anthropic.com/")
+                print("   5. Check network connectivity and firewall settings")
+            elif "command not found" in error_msg.lower() or "uvx" in error_msg.lower():
+                print("💡 'uv' package manager not found:")
+                print("   Install uv with: curl -LsSf https://astral.sh/uv/install.sh | sh")
+                print("   Then reload your shell: source ~/.bashrc")
+            else:
+                print("💡 General troubleshooting:")
+                print("   1. Verify config.yaml has correct API key and ClickHouse settings")
+                print("   2. Check the error message above for specific issues")
+                print("   3. Ensure all required dependencies are installed")
+
+            raise
 
         return options
 
@@ -132,17 +182,36 @@ Do NOT execute the query. Just generate it and show it to me."""
 
         except Exception as e:
             error_msg = str(e)
-            print(f"❌ Error: {error_msg}")
+            print(f"\n❌ Error generating SQL: {error_msg}")
 
             # Provide helpful hints for common errors
-            if "exit code -9" in error_msg or "Command failed" in error_msg:
-                print("\n💡 Troubleshooting tips:")
+            if "timeout" in error_msg.lower():
+                print("\n💡 Timeout error - possible causes:")
+                print("   1. MCP server not responding (check if uvx is working)")
+                print("   2. ClickHouse server not accessible")
+                print("   3. Network connectivity issues")
+                print("   4. API rate limits or quota exceeded")
+            elif "exit code -9" in error_msg or "Command failed" in error_msg:
+                print("\n💡 Process error troubleshooting:")
                 print("   1. Make sure 'uv' is installed: curl -LsSf https://astral.sh/uv/install.sh | sh")
                 print("   2. After installing uv, reload your shell: source ~/.bashrc")
                 print("   3. Verify uv is in PATH: which uvx")
                 print("   4. Check ClickHouse connection settings in config.yaml")
-            elif "ANTHROPIC_API_KEY" in error_msg:
-                print("\n💡 Please set your Anthropic API key in config.yaml")
+            elif "ANTHROPIC_API_KEY" in error_msg or "api_key" in error_msg.lower():
+                print("\n💡 API key issue:")
+                print("   1. Check your API key in config.yaml is correct")
+                print("   2. Get a valid key from: https://console.anthropic.com/")
+                print("   3. Ensure the key starts with 'sk-ant-api03-'")
+            elif "authentication" in error_msg.lower() or "unauthorized" in error_msg.lower():
+                print("\n💡 Authentication error:")
+                print("   1. Verify your Anthropic API key is valid and active")
+                print("   2. Check you haven't exceeded your API usage limits")
+                print("   3. Ensure billing is set up on your Anthropic account")
+            else:
+                print("\n💡 For debugging, check:")
+                print("   1. Full error message above")
+                print("   2. Config file settings (config.yaml)")
+                print("   3. Network connectivity to both Claude API and ClickHouse")
 
             return None
 
@@ -180,15 +249,30 @@ Please run this query and display the results in a clear, readable format."""
 
         except Exception as e:
             error_msg = str(e)
-            print(f"❌ Error executing query: {error_msg}")
+            print(f"\n❌ Error executing query: {error_msg}")
 
             # Provide helpful hints for common errors
-            if "exit code -9" in error_msg or "Command failed" in error_msg:
-                print("\n💡 Troubleshooting tips:")
+            if "timeout" in error_msg.lower():
+                print("\n💡 Timeout error - possible causes:")
+                print("   1. Query is taking too long to execute")
+                print("   2. ClickHouse server not responding")
+                print("   3. Network connectivity issues")
+            elif "exit code -9" in error_msg or "Command failed" in error_msg:
+                print("\n💡 Process error troubleshooting:")
                 print("   1. Make sure 'uv' is installed: curl -LsSf https://astral.sh/uv/install.sh | sh")
                 print("   2. After installing uv, reload your shell: source ~/.bashrc")
                 print("   3. Verify uv is in PATH: which uvx")
                 print("   4. Check ClickHouse connection settings in config.yaml")
+            elif "permission" in error_msg.lower() or "access denied" in error_msg.lower():
+                print("\n💡 Permission error:")
+                print("   1. Check ClickHouse user has SELECT permissions")
+                print("   2. Verify database name is correct")
+                print("   3. Check user credentials in config.yaml")
+            else:
+                print("\n💡 For debugging, check:")
+                print("   1. Full error message above")
+                print("   2. SQL query syntax")
+                print("   3. Table and column names exist in the database")
 
     async def interactive_mode(self):
         """Run the agent in interactive mode."""
@@ -235,10 +319,22 @@ async def main():
     try:
         agent = ClickHouseAgent()
         await agent.interactive_mode()
-    except FileNotFoundError:
-        print("❌ Error: config.yaml not found. Please create the configuration file.")
+    except FileNotFoundError as e:
+        print(f"\n❌ Configuration Error: {str(e)}")
+        print("\n💡 Create a config.yaml file based on config.yaml.example")
+        print("   Copy config.yaml.example to config.yaml and update the values")
+    except ValueError as e:
+        print(f"\n{str(e)}")
+    except KeyboardInterrupt:
+        print("\n\n👋 Goodbye!")
     except Exception as e:
-        print(f"❌ Error initializing agent: {str(e)}")
+        print(f"\n❌ Failed to initialize agent")
+        print(f"Error: {str(e)}")
+        print("\n💡 Please check:")
+        print("   1. Your config.yaml file is valid YAML format")
+        print("   2. All required fields are present (see config.yaml.example)")
+        print("   3. Your Anthropic API key is correct")
+        print("   4. Your ClickHouse connection details are correct")
 
 
 if __name__ == "__main__":
