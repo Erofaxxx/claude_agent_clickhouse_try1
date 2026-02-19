@@ -1,0 +1,171 @@
+Создай ии-агента на python, который принимает запрос пользователя. И задает этот вопрос в базу данных и выдает sql ClickHouse, который выполнится, но не выполняет его, но если пользователь потом попросит выполнить этот запрос , то чтобы выполнил.
+
+Нужно чтобы у Агнета был Mcp ClickHouse, и доступ к базе данных. 
+
+
+
+Ниже — краткая инструкция на основе документации по Claude Agent SDK и ClickHouse MCP Server. [[Claude SDK guide](https://clickhouse.com/docs/use-cases/AI/MCP/ai-agent-libraries/claude-agent-sdk)]
+
+---
+
+## 1. Что это за система
+
+- **ClickHouse MCP Server** — сервер инструментов (tools) по протоколу MCP, который умеет:
+  - перечислять базы (`list_databases`)
+  - перечислять таблицы (`list_tables`)
+  - выполнять запросы `SELECT` (`run_select_query`, `run_chdb_select_query`) в ClickHouse.
+- **Claude Agent SDK** — фреймворк от Anthropic для создания агентов Claude, который умеет подключаться к MCP‑серверам и использовать их инструменты.
+
+Цель: агент Claude, который по запросу пользователя сам вызывает инструменты ClickHouse MCP и отвечает на основе данных в ClickHouse.
+
+---
+
+## 2. Предварительные требования
+
+1. Установлен Python и `pip`.
+2. Есть **Anthropic API key**.
+3. Есть доступ к ClickHouse:
+   - в примере используется публичный SQL Playground:
+     ```python
+     env = {
+         "CLICKHOUSE_HOST": "sql-clickhouse.clickhouse.com",
+         "CLICKHOUSE_PORT": "8443",
+         "CLICKHOUSE_USER": "demo",
+         "CLICKHOUSE_PASSWORD": "",
+         "CLICKHOUSE_SECURE": "true",
+     }
+     ```
+     [[Claude SDK guide](https://clickhouse.com/docs/use-cases/AI/MCP/ai-agent-libraries/claude-agent-sdk)]
+
+---
+
+## 3. Установка библиотек
+
+```bash
+pip install -q --upgrade pip
+pip install -q claude-agent-sdk
+pip install -q ipywidgets
+```
+[[Claude SDK guide](https://clickhouse.com/docs/use-cases/AI/MCP/ai-agent-libraries/claude-agent-sdk)]
+
+И задайте переменную окружения `ANTHROPIC_API_KEY` (через `os.environ` или системно).
+
+---
+
+## 4. Настройка окружения ClickHouse
+
+В коде задаём параметры подключения к ClickHouse (можно заменить на свой инстанс):
+
+```python
+env = {
+    "CLICKHOUSE_HOST": "sql-clickhouse.clickhouse.com",
+    "CLICKHOUSE_PORT": "8443",
+    "CLICKHOUSE_USER": "demo",
+    "CLICKHOUSE_PASSWORD": "",
+    "CLICKHOUSE_SECURE": "true"
+}
+```
+[[Claude SDK guide](https://clickhouse.com/docs/use-cases/AI/MCP/ai-agent-libraries/claude-agent-sdk)]
+
+---
+
+## 5. Конфигурация MCP‑сервера и агента Claude
+
+Ключевой объект — `ClaudeAgentOptions`. В нём:
+
+- `mcp_servers` — как запускать ClickHouse MCP Server;
+- `allowed_tools` — какие именно инструменты MCP разрешены (обязательное поле для Claude Agent SDK). [[Claude SDK blog](https://clickhouse.com/blog/how-to-build-ai-agents-mcp-12-frameworks#claude-agent-sdk)]
+
+Пример:
+
+```python
+from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage, UserMessage, TextBlock, ToolUseBlock
+
+options = ClaudeAgentOptions(
+    allowed_tools=[
+        "mcp__mcp-clickhouse__list_databases",
+        "mcp__mcp-clickhouse__list_tables",
+        "mcp__mcp-clickhouse__run_select_query",
+        "mcp__mcp-clickhouse__run_chdb_select_query",
+    ],
+    mcp_servers={
+        "mcp-clickhouse": {
+            "command": "uv",
+            "args": [
+                "run",
+                "--with", "mcp-clickhouse",
+                "--python", "3.10",
+                "mcp-clickhouse",
+            ],
+            "env": env,
+        }
+    },
+)
+```
+[[Initialize MCP and agent](https://clickhouse.com/docs/use-cases/AI/MCP/ai-agent-libraries/claude-agent-sdk#initialize-mcp-and-agent)]
+
+Важно: если не указать `allowed_tools`, агент не увидит ни одного инструмента MCP. [[Claude SDK blog](https://clickhouse.com/blog/how-to-build-ai-agents-mcp-12-frameworks#claude-agent-sdk)]
+
+---
+
+## 6. Вызов агента и обработка ответов
+
+Пример простого цикла, который печатает текст и вызовы инструментов:
+
+```python
+async for message in query(
+    prompt="Tell me something interesting about UK property sales",
+    options=options,
+):
+    if isinstance(message, AssistantMessage):
+        for block in message.content:
+            if isinstance(block, TextBlock):
+                print(f"🤖 {block.text}")
+            if isinstance(block, ToolUseBlock):
+                print(f"🛠️ {block.name} {block.input}")
+    elif isinstance(message, UserMessage):
+        for block in message.content:
+            if isinstance(block, TextBlock):
+                print(block.text)
+```
+[[Initialize MCP and agent](https://clickhouse.com/docs/use-cases/AI/MCP/ai-agent-libraries/claude-agent-sdk#initialize-mcp-and-agent)]
+
+Агент сам:
+
+1. Запрашивает список баз (`list_databases`),
+2. Таблиц (`list_tables`),
+3. Формирует и выполняет SQL‑запрос через `run_select_query`,
+4. Объясняет результат на естественном языке.
+
+---
+
+## 7. Что нужно сделать <name>, чтобы интегрировать систему
+
+1. Подготовить окружение:
+   - Python + `pip`;
+   - установить `claude-agent-sdk`;
+   - настроить `ANTHROPIC_API_KEY`.
+2. Настроить доступ к ClickHouse:
+   - либо использовать SQL Playground (как в примере),
+   - либо подставить параметры своего ClickHouse в `env`.
+3. Настроить запуск MCP‑сервера:
+   - убедиться, что доступна команда `uv` и пакет `mcp-clickhouse`;
+   - прописать `command`, `args`, `env` в `ClaudeAgentOptions.mcp_servers`.
+4. Явно перечислить разрешённые инструменты в `allowed_tools`.
+5. Реализовать обёртку вокруг `query(...)`:
+   - принимать пользовательский запрос,
+   - вызывать `query` с нужным `options`,
+   - выводить текстовые блоки и, при необходимости, логировать вызовы инструментов.
+
+Если нужно, могу помочь адаптировать этот шаблон под ваш конкретный ClickHouse‑кластер (хост, порт, логин/пароль).
+
+
+
+
+
+
+
+
+
+
+
