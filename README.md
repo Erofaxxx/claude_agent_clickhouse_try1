@@ -27,13 +27,114 @@ AI-агент на Python, который принимает запросы по
 
 ## Установка
 
-### 1. Установите Python зависимости
+### Вариант A: Установка на Ubuntu сервере (рекомендуется)
+
+#### 1. Подключитесь к вашему Ubuntu серверу
+
+```bash
+ssh root@your-server-ip
+```
+
+#### 2. Клонируйте репозиторий или скопируйте файлы
+
+```bash
+# Создайте директорию для проекта
+mkdir -p ~/text_to_clickhouse_sql
+cd ~/text_to_clickhouse_sql
+
+# Скопируйте файлы clickhouse_agent.py и requirements.txt на сервер
+# Например, используя scp с локальной машины:
+# scp clickhouse_agent.py requirements.txt root@your-server-ip:~/text_to_clickhouse_sql/
+```
+
+#### 3. Установите Python зависимости
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Установите uv (если ещё не установлен)
+#### 4. Установите uv (если ещё не установлен)
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# После установки перезагрузите оболочку или выполните:
+source ~/.bashrc
+```
+
+#### 5. Настройте конфигурацию
+
+Создайте конфигурационный файл в стандартной директории:
+
+```bash
+# Создайте директорию для конфигурации
+mkdir -p ~/.config/clickhouse
+
+# Создайте файл конфигурации
+nano ~/.config/clickhouse/config.yaml
+```
+
+Содержимое файла `~/.config/clickhouse/config.yaml`:
+
+```yaml
+clickhouse:
+  host: rc1b-vsrkuug8qh3pkkeg.mdb.yandexcloud.net
+  port: 9440
+  user: analyst_ym
+  password: StrongPass123!
+  database: ym_sanok
+  secure: true
+  openSSL:
+    client:
+      caConfig: /root/.clickhouse-client/root.crt
+
+ai:
+  provider: anthropic
+  api_key: sk-ant-api03-YOUR_API_KEY_HERE
+  model: claude-sonnet-4-6
+  temperature: 0.0
+  max_tokens: 1000
+  timeout_seconds: 30
+  enable_schema_access: true
+  database: ym_sanok
+```
+
+**Важно:**
+- Замените `YOUR_API_KEY_HERE` на ваш реальный Anthropic API ключ
+- Убедитесь, что SSL сертификат находится по пути `/root/.clickhouse-client/root.crt`
+
+```bash
+# Проверьте наличие сертификата
+ls -la /root/.clickhouse-client/root.crt
+```
+
+#### 6. Обновите путь к конфигурации в программе
+
+По умолчанию программа ищет `config.yaml` в текущей директории. Для использования конфигурации из `~/.config/clickhouse/`, запустите программу с указанием пути:
+
+```bash
+cd ~/text_to_clickhouse_sql
+python clickhouse_agent.py
+```
+
+Или измените путь в коде, отредактировав `clickhouse_agent.py`:
+
+```python
+# Найдите строку:
+def __init__(self, config_path: str = "config.yaml"):
+
+# Измените на:
+def __init__(self, config_path: str = os.path.expanduser("~/.config/clickhouse/config.yaml")):
+```
+
+### Вариант B: Локальная установка
+
+#### 1. Установите Python зависимости
+
+```bash
+pip install -r requirements.txt
+```
+
+#### 2. Установите uv
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -44,41 +145,34 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-### 3. Настройте конфигурацию
+#### 3. Создайте config.yaml в директории проекта
 
-Файл `config.yaml` уже содержит все необходимые параметры:
-
-```yaml
-clickhouse:
-  host: rc1b-vsrkuug8qh3pkkeg.mdb.yandexcloud.net
-  port: 9440
-  user: User_main
-  password: click_security_house_7659
-  database: ym_sanok
-  secure: true
-
-ai:
-  provider: anthropic
-  api_key: sk-ant-api03-...
-  model: claude-sonnet-4-6
-  temperature: 0.0
-  max_tokens: 1000
-```
-
-**Важно:** Для продакшен использования рекомендуется хранить чувствительные данные (пароли, API ключи) в переменных окружения.
-
-### 4. Настройте SSL сертификат (опционально)
-
-Если требуется SSL сертификат для подключения к ClickHouse:
+Скопируйте `config.yaml.example` в `config.yaml` и заполните своими данными:
 
 ```bash
-mkdir -p /root/.clickhouse-client/
-# Поместите ваш root.crt в /root/.clickhouse-client/root.crt
+cp config.yaml.example config.yaml
+nano config.yaml
 ```
 
 ## Использование
 
 ### Запуск агента
+
+**На Ubuntu сервере:**
+
+```bash
+# Перейдите в директорию проекта
+cd ~/text_to_clickhouse_sql
+
+# Запустите агент (если используется ~/.config/clickhouse/config.yaml)
+python clickhouse_agent.py
+
+# Или создайте символическую ссылку на конфигурацию:
+ln -s ~/.config/clickhouse/config.yaml ~/text_to_clickhouse_sql/config.yaml
+python clickhouse_agent.py
+```
+
+**Локально:**
 
 ```bash
 python clickhouse_agent.py
@@ -208,18 +302,62 @@ SELECT COUNT(*) FROM your_table;
 ## Устранение проблем
 
 ### Ошибка: "config.yaml not found"
+
+**На сервере Ubuntu:**
+```bash
+# Убедитесь, что конфигурация существует
+ls -la ~/.config/clickhouse/config.yaml
+
+# Создайте символическую ссылку в директорию проекта
+cd ~/text_to_clickhouse_sql
+ln -s ~/.config/clickhouse/config.yaml config.yaml
+```
+
+**Локально:**
 Убедитесь, что файл `config.yaml` находится в той же директории, что и `clickhouse_agent.py`.
 
 ### Ошибка: "ANTHROPIC_API_KEY not set"
-Проверьте, что API ключ указан в `config.yaml` или установлен в переменной окружения.
+Проверьте, что API ключ указан в `config.yaml` или в `~/.config/clickhouse/config.yaml`.
 
 ### Ошибка: "uv command not found"
-Установите `uv` менеджер пакетов: https://github.com/astral-sh/uv
+```bash
+# Установите uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Перезагрузите оболочку
+source ~/.bashrc
+
+# Проверьте установку
+uv --version
+```
 
 ### Проблемы с подключением к ClickHouse
-- Проверьте параметры подключения в `config.yaml`
-- Убедитесь, что сервер ClickHouse доступен
-- Проверьте наличие SSL сертификата, если используется secure: true
+- Проверьте параметры подключения в `~/.config/clickhouse/config.yaml`
+- Убедитесь, что используется правильный пользователь: `analyst_ym`
+- Убедитесь, что сервер ClickHouse доступен с вашего сервера
+- Проверьте наличие SSL сертификата:
+  ```bash
+  ls -la /root/.clickhouse-client/root.crt
+  ```
+- Проверьте права доступа к сертификату:
+  ```bash
+  chmod 600 /root/.clickhouse-client/root.crt
+  ```
+
+### Тестирование подключения к ClickHouse
+
+Перед запуском агента можно проверить подключение к ClickHouse:
+
+```bash
+clickhouse-client \
+  --host rc1b-vsrkuug8qh3pkkeg.mdb.yandexcloud.net \
+  --port 9440 \
+  --user analyst_ym \
+  --password 'StrongPass123!' \
+  --database ym_sanok \
+  --secure \
+  --query "SELECT 1"
+```
 
 ## Дополнительная информация
 

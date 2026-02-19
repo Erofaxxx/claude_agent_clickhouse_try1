@@ -21,9 +21,24 @@ class ClickHouseAgent:
         self.options = self._setup_agent_options()
 
     def _load_config(self, config_path: str) -> Dict:
-        """Load configuration from YAML file."""
-        with open(config_path, 'r', encoding='utf-8') as f:
-            return yaml.safe_load(f)
+        """Load configuration from YAML file with fallback locations."""
+        # Try multiple locations in order
+        config_locations = [
+            config_path,  # User-specified or default "config.yaml"
+            os.path.expanduser("~/.config/clickhouse/config.yaml"),  # Ubuntu standard location
+            os.path.join(os.path.dirname(__file__), "config.yaml"),  # Script directory
+        ]
+
+        for location in config_locations:
+            if os.path.exists(location):
+                print(f"📂 Loading configuration from: {location}")
+                with open(location, 'r', encoding='utf-8') as f:
+                    return yaml.safe_load(f)
+
+        raise FileNotFoundError(
+            f"Configuration file not found. Tried locations:\n" +
+            "\n".join(f"  - {loc}" for loc in config_locations)
+        )
 
     def _setup_agent_options(self) -> ClaudeAgentOptions:
         """Setup Claude Agent options with ClickHouse MCP server."""

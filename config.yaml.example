@@ -1,13 +1,13 @@
 clickhouse:
-  host: your-clickhouse-host.example.com
+  host: rc1b-vsrkuug8qh3pkkeg.mdb.yandexcloud.net
   port: 9440
-  user: your_username
-  password: your_password
-  database: your_database
+  user: analyst_ym
+  password: your_password_here
+  database: ym_sanok
   secure: true
   openSSL:
     client:
-      caConfig: /path/to/root.crt
+      caConfig: /root/.clickhouse-client/root.crt
 
 ai:
   provider: anthropic
@@ -17,3 +17,5 @@ ai:
   max_tokens: 1000
   timeout_seconds: 30
   enable_schema_access: true
+  database: ym_sanok
+
