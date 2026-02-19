@@ -49,14 +49,16 @@ class ClickHouseAgent:
         os.environ['ANTHROPIC_API_KEY'] = ai_config['api_key']
 
         # Setup environment variables for ClickHouse MCP server
-        env = {
+        # Start with system environment so PATH and other essentials are available
+        env = os.environ.copy()
+        env.update({
             "CLICKHOUSE_HOST": clickhouse_config['host'],
             "CLICKHOUSE_PORT": str(clickhouse_config['port']),
             "CLICKHOUSE_USER": clickhouse_config['user'],
             "CLICKHOUSE_PASSWORD": clickhouse_config['password'],
             "CLICKHOUSE_DATABASE": clickhouse_config['database'],
             "CLICKHOUSE_SECURE": str(clickhouse_config['secure']).lower(),
-        }
+        })
 
         # Create agent options with MCP server configuration
         options = ClaudeAgentOptions(
@@ -79,8 +81,6 @@ class ClickHouseAgent:
                 }
             },
             model=ai_config.get('model', 'claude-sonnet-4'),
-            temperature=ai_config.get('temperature', 0.0),
-            max_tokens=ai_config.get('max_tokens', 1000),
         )
 
         return options
