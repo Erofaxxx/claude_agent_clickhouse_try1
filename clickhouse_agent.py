@@ -79,8 +79,6 @@ class ClickHouseAgent:
                 }
             },
             model=ai_config.get('model', 'claude-sonnet-4'),
-            temperature=ai_config.get('temperature', 0.0),
-            max_tokens=ai_config.get('max_tokens', 1000),
         )
 
         return options
