@@ -115,16 +115,72 @@ python clickhouse_agent.py
 - **Ветка:** `claude/fix-connection-error-messages-again`
 - **Коммит:** `9bfe606 - Add specific error handling for MCP server initialization timeout`
 
+## ✅ ПРОБЛЕМА РЕШЕНА!
+
+Судя по выводу команд, `uvx` установлен и работает правильно:
+
+```bash
+(venv) root@clickhouse:~/claude_agent_clickhouse_try1# which uvx
+/root/.local/bin/uvx
+
+(venv) root@clickhouse:~/claude_agent_clickhouse_try1# uvx --version
+uvx 0.10.4
+
+(venv) root@clickhouse:~/claude_agent_clickhouse_try1# uvx mcp-clickhouse --help
+[02/19/26 20:38:22] INFO Starting MCP server 'mcp-clickhouse' with transport 'stdio'
+```
+
+**Отлично!** MCP сервер запускается успешно.
+
 ## Следующие шаги
 
-1. Выполните рекомендации из "Что вам нужно сделать сейчас" (см. выше)
-2. Если проблема решится, можно смерджить этот Pull Request в main ветку
-3. Если проблема не решится, новое сообщение об ошибке даст более точную информацию для дальнейшей диагностики
+Теперь вы можете:
+
+1. **Запустить агент снова:**
+   ```bash
+   python clickhouse_agent.py
+   ```
+
+2. **Задать свой вопрос:**
+   ```
+   💬 You: какие таблицы есть в базе данных
+   ```
+
+3. **Агент должен работать без ошибок!** Он сможет:
+   - Подключиться к ClickHouse через MCP сервер
+   - Получить список таблиц
+   - Сгенерировать SQL запрос
+   - Выполнить его после вашего подтверждения
+
+4. **Если всё работает хорошо:**
+   - Можно смерджить этот Pull Request в main ветку
+   - Улучшенные сообщения об ошибках останутся на случай будущих проблем
+
+## Если проблема всё ещё возникает
+
+Если вы всё ещё видите ошибку "Control request timeout: initialize" даже после проверки `uvx`:
+
+1. **Увеличьте таймаут в config.yaml:**
+   ```yaml
+   ai:
+     timeout_seconds: 60  # или даже 90
+   ```
+
+2. **Проверьте доступность ClickHouse сервера:**
+   ```bash
+   nc -zv rc1b-vsrkuug8qh3pkkeg.mdb.yandexcloud.net 9440
+   ```
+
+3. **Проверьте правильность учётных данных в config.yaml**
+
+4. **Попробуйте запустить в режиме отладки:**
+   ```bash
+   python -u clickhouse_agent.py
+   ```
 
 ## Вопросы?
 
-Если у вас остались вопросы или проблема не решилась, пожалуйста, предоставьте:
-1. Вывод команды `which uvx`
-2. Вывод команды `uvx --version`
-3. Полный текст ошибки, который вы видите
-4. Содержимое вашего `config.yaml` (без паролей!)
+Если у вас остались вопросы, пожалуйста, предоставьте:
+1. Полный текст ошибки (если она ещё возникает)
+2. Содержимое вашего `config.yaml` (без паролей!)
+3. Результат команды: `nc -zv rc1b-vsrkuug8qh3pkkeg.mdb.yandexcloud.net 9440`
