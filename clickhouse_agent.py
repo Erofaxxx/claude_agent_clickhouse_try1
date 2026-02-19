@@ -16,6 +16,7 @@ class ClickHouseAgent:
 
     def __init__(self, config_path: str = "config.yaml"):
         """Initialize the agent with configuration."""
+        self.config_path = config_path
         self.config = self._load_config(config_path)
         self.last_sql_query = None
         self.options = self._setup_agent_options()
@@ -73,6 +74,7 @@ class ClickHouseAgent:
                     "command": "uvx",
                     "args": [
                         "mcp-clickhouse",
+                        "--config", self.config_path
                     ],
                     "env": env,
                 }
