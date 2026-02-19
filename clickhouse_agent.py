@@ -185,7 +185,20 @@ Do NOT execute the query. Just generate it and show it to me."""
             print(f"\n❌ Error generating SQL: {error_msg}")
 
             # Provide helpful hints for common errors
-            if "timeout" in error_msg.lower():
+            if "control request timeout" in error_msg.lower() and "initialize" in error_msg.lower():
+                print("\n💡 MCP server initialization timeout - the server is not responding:")
+                print("   1. Verify 'uv' is properly installed and in PATH:")
+                print("      Run: which uvx")
+                print("      If not found, install: curl -LsSf https://astral.sh/uv/install.sh | sh")
+                print("      Then reload shell: source ~/.bashrc")
+                print("   2. Test mcp-clickhouse package directly:")
+                print("      Run: uvx mcp-clickhouse --help")
+                print("   3. Check ClickHouse connectivity from the MCP server:")
+                print(f"      Host: {self.config['clickhouse']['host']}:{self.config['clickhouse']['port']}")
+                print("      Ensure the server is reachable and credentials are correct")
+                print("   4. Check if there are any firewall rules blocking the connection")
+                print("   5. Try increasing timeout in config.yaml (ai.timeout_seconds)")
+            elif "timeout" in error_msg.lower():
                 print("\n💡 Timeout error - possible causes:")
                 print("   1. MCP server not responding (check if uvx is working)")
                 print("   2. ClickHouse server not accessible")
@@ -252,7 +265,20 @@ Please run this query and display the results in a clear, readable format."""
             print(f"\n❌ Error executing query: {error_msg}")
 
             # Provide helpful hints for common errors
-            if "timeout" in error_msg.lower():
+            if "control request timeout" in error_msg.lower() and "initialize" in error_msg.lower():
+                print("\n💡 MCP server initialization timeout - the server is not responding:")
+                print("   1. Verify 'uv' is properly installed and in PATH:")
+                print("      Run: which uvx")
+                print("      If not found, install: curl -LsSf https://astral.sh/uv/install.sh | sh")
+                print("      Then reload shell: source ~/.bashrc")
+                print("   2. Test mcp-clickhouse package directly:")
+                print("      Run: uvx mcp-clickhouse --help")
+                print("   3. Check ClickHouse connectivity from the MCP server:")
+                print(f"      Host: {self.config['clickhouse']['host']}:{self.config['clickhouse']['port']}")
+                print("      Ensure the server is reachable and credentials are correct")
+                print("   4. Check if there are any firewall rules blocking the connection")
+                print("   5. Try increasing timeout in config.yaml (ai.timeout_seconds)")
+            elif "timeout" in error_msg.lower():
                 print("\n💡 Timeout error - possible causes:")
                 print("   1. Query is taking too long to execute")
                 print("   2. ClickHouse server not responding")
