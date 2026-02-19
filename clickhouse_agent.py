@@ -70,11 +70,8 @@ class ClickHouseAgent:
             ],
             mcp_servers={
                 "mcp-clickhouse": {
-                    "command": "uv",
+                    "command": "uvx",
                     "args": [
-                        "run",
-                        "--with", "mcp-clickhouse",
-                        "--python", "3.10",
                         "mcp-clickhouse",
                     ],
                     "env": env,
@@ -132,7 +129,19 @@ Do NOT execute the query. Just generate it and show it to me."""
                             print(f"   Input: {block.input}")
 
         except Exception as e:
-            print(f"❌ Error: {str(e)}")
+            error_msg = str(e)
+            print(f"❌ Error: {error_msg}")
+
+            # Provide helpful hints for common errors
+            if "exit code -9" in error_msg or "Command failed" in error_msg:
+                print("\n💡 Troubleshooting tips:")
+                print("   1. Make sure 'uv' is installed: curl -LsSf https://astral.sh/uv/install.sh | sh")
+                print("   2. After installing uv, reload your shell: source ~/.bashrc")
+                print("   3. Verify uv is in PATH: which uvx")
+                print("   4. Check ClickHouse connection settings in config.yaml")
+            elif "ANTHROPIC_API_KEY" in error_msg:
+                print("\n💡 Please set your Anthropic API key in config.yaml")
+
             return None
 
         self.last_sql_query = sql_query
@@ -168,7 +177,16 @@ Please run this query and display the results in a clear, readable format."""
                                 print(f"   Query: {block.input.get('query', '')}")
 
         except Exception as e:
-            print(f"❌ Error executing query: {str(e)}")
+            error_msg = str(e)
+            print(f"❌ Error executing query: {error_msg}")
+
+            # Provide helpful hints for common errors
+            if "exit code -9" in error_msg or "Command failed" in error_msg:
+                print("\n💡 Troubleshooting tips:")
+                print("   1. Make sure 'uv' is installed: curl -LsSf https://astral.sh/uv/install.sh | sh")
+                print("   2. After installing uv, reload your shell: source ~/.bashrc")
+                print("   3. Verify uv is in PATH: which uvx")
+                print("   4. Check ClickHouse connection settings in config.yaml")
 
     async def interactive_mode(self):
         """Run the agent in interactive mode."""

@@ -331,6 +331,50 @@ source ~/.bashrc
 uv --version
 ```
 
+### Ошибка: "Fatal error in message reader: Command failed with exit code -9"
+
+Эта ошибка означает, что MCP сервер не может запуститься. Причины и решения:
+
+**1. Не установлен uv:**
+```bash
+# Установите uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Перезагрузите оболочку
+source ~/.bashrc
+
+# Проверьте, что uvx доступен
+which uvx
+uvx --version
+```
+
+**2. Проблемы с Python окружением:**
+```bash
+# Проверьте версию Python (нужна 3.10 или выше)
+python3 --version
+
+# Убедитесь, что pip установлен
+python3 -m pip --version
+```
+
+**3. Проверьте, что Anthropic API ключ корректен:**
+- Откройте config.yaml
+- Убедитесь, что `api_key` начинается с `sk-ant-api03-`
+- Проверьте, что ключ действителен в вашем аккаунте Anthropic
+
+**4. Проверьте подключение к ClickHouse:**
+```bash
+# Используйте clickhouse-client для тестирования
+clickhouse-client \
+  --host <your-host> \
+  --port 9440 \
+  --user <your-user> \
+  --password '<your-password>' \
+  --database <your-database> \
+  --secure \
+  --query "SELECT 1"
+```
+
 ### Проблемы с подключением к ClickHouse
 - Проверьте параметры подключения в `~/.config/clickhouse/config.yaml`
 - Убедитесь, что используется правильный пользователь: `analyst_ym`
